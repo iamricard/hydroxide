@@ -1,6 +1,7 @@
 package log
 
 import (
+	"errors"
 	"net/http"
 	"os"
 	"sync/atomic"
@@ -21,8 +22,12 @@ func load() *zerolog.Logger {
 
 type HttpLogger struct {
 	http.ResponseWriter
-	status int
+	status       int
+	responseSize int
+	err          error
 }
+
+var _ http.ResponseWriter = &HttpLogger{}
 
 func Http(rw http.ResponseWriter) *HttpLogger {
 	return &HttpLogger{ResponseWriter: rw}
@@ -33,9 +38,18 @@ func (l *HttpLogger) WriteHeader(statusCode int) {
 	l.status = statusCode
 }
 
-func (l HttpLogger) Log() *zerolog.Event {
-	if l.status < 400 {
-		return load().Info().Int("status", l.status)
+func (l *HttpLogger) Write(b []byte) (int, error) {
+	size, err := l.ResponseWriter.Write(b)
+	l.responseSize = size
+	if l.status > 400 {
+		l.err = errors.New(string(b))
 	}
-	return load().Error().Int("status", l.status)
+	return size, err
+}
+
+func (l HttpLogger) Log() *zerolog.Event {
+	return load().
+		Err(l.err).
+		Int("status", l.status).
+		Int("response_size", l.responseSize)
 }

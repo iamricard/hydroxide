@@ -194,7 +194,7 @@ func (b *backend) GetAddressObject(ctx context.Context, path string, req *cardda
 	contact, ok := b.getCache(id)
 	if !ok {
 		if b.cacheComplete() {
-			return nil, fmt.Errorf("GetAddressObject: %w", errNotFound)
+			return nil, fmt.Errorf("GetAddressObject: (cache complete) %w", errNotFound)
 		}
 
 		if contact, err = b.c.GetContact(id); err != nil {
@@ -401,7 +401,11 @@ func NewHandler(c *protonmail.Client, privateKeys openpgp.EntityList, events <-c
 		start := time.Now()
 		logger := log.Http(writer)
 
-		handler.ServeHTTP(logger, request)
+		if request.RequestURI == "/contacts/" {
+			http.Redirect(logger, request, "/contacts", http.StatusPermanentRedirect)
+		} else {
+			handler.ServeHTTP(logger, request)
+		}
 
 		logger.Log().
 			Str("method", request.Method).

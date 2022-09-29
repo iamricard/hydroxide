@@ -12,7 +12,7 @@ import (
 
 var logger atomic.Value
 
-func load() *zerolog.Logger {
+func Load() *zerolog.Logger {
 	if l := logger.Load(); l == nil {
 		consoleLogger := zlog.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 		logger.Store(&consoleLogger)
@@ -48,7 +48,7 @@ func (l *HttpLogger) Write(b []byte) (int, error) {
 }
 
 func (l HttpLogger) Log() *zerolog.Event {
-	return load().
+	return Load().
 		Err(l.err).
 		Int("status", l.status).
 		Int("response_size", l.responseSize)

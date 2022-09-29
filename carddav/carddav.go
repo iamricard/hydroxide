@@ -17,6 +17,7 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/emersion/go-vcard"
 	"github.com/emersion/go-webdav/carddav"
+
 	"github.com/emersion/hydroxide/log"
 	"github.com/emersion/hydroxide/protonmail"
 )
@@ -187,25 +188,26 @@ func (b *backend) deleteCache(id string) {
 func (b *backend) GetAddressObject(ctx context.Context, path string, req *carddav.AddressDataRequest) (*carddav.AddressObject, error) {
 	id, err := parseAddressObjectPath(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("GetAddressObject: %w", err)
 	}
 
 	contact, ok := b.getCache(id)
 	if !ok {
 		if b.cacheComplete() {
-			return nil, errNotFound
+			return nil, fmt.Errorf("GetAddressObject: %w", errNotFound)
 		}
 
-		contact, err = b.c.GetContact(id)
-		if apiErr, ok := err.(*protonmail.APIError); ok && apiErr.Code == 13051 {
-			return nil, errNotFound
-		} else if err != nil {
-			return nil, err
+		if contact, err = b.c.GetContact(id); err != nil {
+			return nil, fmt.Errorf("GetAddressObject: %w", err)
 		}
 		b.putCache(contact)
 	}
 
-	return b.toAddressObject(contact, req)
+	o, err := b.toAddressObject(contact, req)
+	if err != nil {
+		return nil, fmt.Errorf("GetAddressObject: %w", err)
+	}
+	return o, nil
 }
 
 func (b *backend) ListAddressObjects(ctx context.Context, req *carddav.AddressDataRequest) ([]carddav.AddressObject, error) {
@@ -217,7 +219,7 @@ func (b *backend) ListAddressObjects(ctx context.Context, req *carddav.AddressDa
 		for _, contact := range b.cache {
 			ao, err := b.toAddressObject(contact, req)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("ListAddressObjects: %w", err)
 			}
 			aos = append(aos, *ao)
 		}
@@ -229,7 +231,7 @@ func (b *backend) ListAddressObjects(ctx context.Context, req *carddav.AddressDa
 	// TODO: paging support
 	total, contacts, err := b.c.ListContacts(0, 0)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ListAddressObjects: %w", err)
 	}
 	b.locker.Lock()
 	b.total = total
@@ -246,7 +248,7 @@ func (b *backend) ListAddressObjects(ctx context.Context, req *carddav.AddressDa
 	for {
 		_, contacts, err := b.c.ListContactsExport(page, 0)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("ListAddressObjects: %w", err)
 		}
 
 		for _, contactExport := range contacts {
@@ -259,7 +261,7 @@ func (b *backend) ListAddressObjects(ctx context.Context, req *carddav.AddressDa
 
 			ao, err := b.toAddressObject(contact, req)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("ListAddressObjects: %w", err)
 			}
 			aos = append(aos, *ao)
 		}
@@ -282,21 +284,25 @@ func (b *backend) QueryAddressObjects(ctx context.Context, query *carddav.Addres
 	// TODO: optimize
 	all, err := b.ListAddressObjects(ctx, &req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("QueryAddressObjects: %w", err)
 	}
 
-	return carddav.Filter(query, all)
+	o, err := carddav.Filter(query, all)
+	if err != nil {
+		return nil, fmt.Errorf("QueryAddressObjects: %w", err)
+	}
+	return o, nil
 }
 
 func (b *backend) PutAddressObject(ctx context.Context, path string, card vcard.Card, opts *carddav.PutAddressObjectOptions) (loc string, err error) {
 	id, err := parseAddressObjectPath(path)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("PutAddressObject: %w", err)
 	}
 
 	contactImport, err := formatCard(card, b.privateKeys[0])
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("PutAddressObject: %w", err)
 	}
 
 	var contact *protonmail.Contact
@@ -305,19 +311,19 @@ func (b *backend) PutAddressObject(ctx context.Context, path string, card vcard.
 	if _, getErr := b.GetAddressObject(ctx, path, &req); getErr == nil {
 		contact, err = b.c.UpdateContact(id, contactImport)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("PutAddressObject: %w", err)
 		}
 	} else {
 		resps, err := b.c.CreateContacts([]*protonmail.ContactImport{contactImport})
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("PutAddressObject: %w", err)
 		}
 		if len(resps) != 1 {
-			return "", errors.New("hydroxide/carddav: expected exactly one response when creating contact")
+			return "", fmt.Errorf("PutAddressObject: hydroxide/carddav: expected exactly one response when creating contact")
 		}
 		resp := resps[0]
 		if err := resp.Err(); err != nil {
-			return "", err
+			return "", fmt.Errorf("PutAddressObject: %w", err)
 		}
 		contact = resp.Response.Contact
 	}
@@ -331,19 +337,19 @@ func (b *backend) PutAddressObject(ctx context.Context, path string, card vcard.
 func (b *backend) DeleteAddressObject(ctx context.Context, path string) error {
 	id, err := parseAddressObjectPath(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("DeleteAddressObject: %w", err)
 	}
 	resps, err := b.c.DeleteContacts([]string{id})
 	if err != nil {
-		return err
+		return fmt.Errorf("DeleteAddressObject: %w", err)
 	}
 	if len(resps) != 1 {
-		return errors.New("hydroxide/carddav: expected exactly one response when deleting contact")
+		return fmt.Errorf("DeleteAddressObject: hydroxide/carddav: expected exactly one response when deleting contact")
 	}
 	resp := resps[0]
 	// TODO: decrement b.total if necessary
 	b.deleteCache(id)
-	return resp.Err()
+	return fmt.Errorf("DeleteAddressObject: %w", resp.Err())
 }
 
 func (b *backend) receiveEvents(events <-chan *protonmail.Event) {

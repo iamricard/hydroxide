@@ -12,10 +12,12 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/emersion/go-vcard"
 	"github.com/emersion/go-webdav/carddav"
+	"github.com/emersion/hydroxide/log"
 	"github.com/emersion/hydroxide/protonmail"
 )
 
@@ -388,5 +390,16 @@ func NewHandler(c *protonmail.Client, privateKeys openpgp.EntityList, events <-c
 		go b.receiveEvents(events)
 	}
 
-	return &carddav.Handler{b}
+	handler := &carddav.Handler{b}
+	instrumented := http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		start := time.Now()
+
+		handler.ServeHTTP(writer, request)
+
+		log.L().Info().
+			Dur("duration", time.Since(start)).
+			Str("URI", request.RequestURI).
+			Str("method", request.Method).Msg("CardDAV backend")
+	})
+	return instrumented
 }

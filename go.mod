@@ -12,6 +12,7 @@ require (
 	github.com/emersion/go-smtp v0.15.0
 	github.com/emersion/go-vcard v0.0.0-20220507122617-d4056df0ec4a
 	github.com/emersion/go-webdav v0.3.2-0.20220524091811-5d845721d8f7
+	github.com/rs/zerolog v1.28.0
 	golang.org/x/crypto v0.0.0-20220817201139-bc19a97f63c8
 	golang.org/x/term v0.0.0-20220722155259-a9ba230a4035
 )
@@ -20,6 +21,8 @@ require (
 	github.com/cloudflare/circl v1.2.0 // indirect
 	github.com/emersion/go-sasl v0.0.0-20211008083017-0b9dcfb154ac // indirect
 	github.com/emersion/go-textwrapper v0.0.0-20200911093747-65d896831594 // indirect
-	golang.org/x/sys v0.0.0-20220818161305-2296e01440c6 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-isatty v0.0.16 // indirect
+	golang.org/x/sys v0.0.0-20220928140112-f11e5e49a4ec // indirect
 	golang.org/x/text v0.3.7 // indirect
 )

@@ -393,12 +393,11 @@ func NewHandler(c *protonmail.Client, privateKeys openpgp.EntityList, events <-c
 	handler := &carddav.Handler{Backend: b}
 	instrumented := http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		start := time.Now()
-		iWriter := &instrumentedWriter{ResponseWriter: writer}
+		logger := log.Http(writer)
 
-		handler.ServeHTTP(iWriter, request)
+		handler.ServeHTTP(logger, request)
 
-		log.L().Info().
-			Int("status", iWriter.status).
+		logger.Log().
 			Str("method", request.Method).
 			Str("URI", request.RequestURI).
 			Dur("duration", time.Since(start)).
@@ -406,15 +405,3 @@ func NewHandler(c *protonmail.Client, privateKeys openpgp.EntityList, events <-c
 	})
 	return instrumented
 }
-
-type instrumentedWriter struct {
-	http.ResponseWriter
-	status int
-}
-
-func (w *instrumentedWriter) WriteHeader(statusCode int) {
-	w.ResponseWriter.WriteHeader(statusCode)
-	w.status = statusCode
-}
-
-var _ http.ResponseWriter = &instrumentedWriter{}

@@ -201,7 +201,7 @@ func (c *Client) AuthRefresh(expiredAuth *Auth) (*Auth, error) {
 	}
 
 	auth := respData.auth()
-	//auth.EventID = expiredAuth.EventID
+	// auth.EventID = expiredAuth.EventID
 	auth.PasswordMode = expiredAuth.PasswordMode
 	return auth, nil
 }
@@ -284,7 +284,7 @@ func decryptPrivateKeyToken(key *PrivateKey, userKeyRing openpgp.EntityList) ([]
 	return b, err
 }
 
-func unlockPrivateKey(key *PrivateKey, userKeyRing openpgp.EntityList, keySalt []byte, passphraseBytes []byte) (*openpgp.Entity, error) {
+func unlockPrivateKey(key *PrivateKey, userKeyRing openpgp.EntityList, keySalt, passphraseBytes []byte) (*openpgp.Entity, error) {
 	entity, err := key.Entity()
 	if err != nil {
 		return nil, err
@@ -329,6 +329,8 @@ func unlockKeyRing(keys []*PrivateKey, userKeyRing openpgp.EntityList, keySalts 
 }
 
 func (c *Client) Unlock(auth *Auth, keySalts map[string][]byte, passphrase string) (openpgp.EntityList, error) {
+	var keyRing openpgp.EntityList
+
 	c.uid = auth.UID
 	c.accessToken = auth.AccessToken
 
@@ -341,13 +343,13 @@ func (c *Client) Unlock(auth *Auth, keySalts map[string][]byte, passphrase strin
 	if err != nil {
 		return nil, err
 	}
+	keyRing = append(keyRing, userKeyRing...)
 
 	addrs, err := c.ListAddresses()
 	if err != nil {
 		return nil, err
 	}
 
-	var keyRing openpgp.EntityList
 	for _, addr := range addrs {
 		addrKeyRing, err := unlockKeyRing(addr.Keys, userKeyRing, keySalts, []byte(passphrase))
 		if err != nil {
@@ -356,10 +358,6 @@ func (c *Client) Unlock(auth *Auth, keySalts map[string][]byte, passphrase strin
 		}
 
 		keyRing = append(keyRing, addrKeyRing...)
-	}
-
-	if len(keyRing) == 0 {
-		return nil, fmt.Errorf("failed to unlock any key")
 	}
 
 	c.keyRing = keyRing

@@ -7,13 +7,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
-
-	"log"
 )
 
 const Version = 3
